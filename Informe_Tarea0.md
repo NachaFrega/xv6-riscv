@@ -38,5 +38,7 @@ make qemu
 ```
 #### Adjunto capturas de pantalla del xv6 funcionando:
 
+![xv6 funcionando1](/imagenes/captura1.png)
+![xv6 funcionando2](/imagenes/captura2.png)
 
 
