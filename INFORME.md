@@ -18,5 +18,5 @@ yosoytupadre
 
 #### Adjunto capturas de pantalla del xv6 funcionando:
 
-![xv6 funcionando3](/imagenes/captura1.png)
+![xv6 funcionando3](/comandos.png)
 
