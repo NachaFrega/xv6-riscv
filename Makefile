@@ -115,13 +115,6 @@ $U/_forktest: $U/forktest.o $(ULIB)
 
 mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 	gcc -Werror -Wall -I. -o mkfs/mkfs mkfs/mkfs.c
-	
-$U/_getppid_test: $U/getppid_test.o $(ULIB)
-	$(LD) $(LDFLAGS) -T $U/user.ld -o $U/_getppid_test $U/getppid_test.o $(ULIB)
-	$(OBJDUMP) -S $U/_getppid_test > $U/getppid_test.asm
-	$(OBJDUMP) -t $U/_getppid_test | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $U/getppid_test.sym
-
-	
 
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
@@ -131,6 +124,7 @@ $U/_getppid_test: $U/getppid_test.o $(ULIB)
 
 UPROGS=\
 	$U/_cat\
+	$U/_test_prioridad\
 	$U/_echo\
 	$U/_forktest\
 	$U/_grep\
@@ -145,9 +139,13 @@ UPROGS=\
 	$U/_usertests\
 	$U/_grind\
 	$U/_wc\
-	$U/_zombie\
-	$U/_getppid_test\
-	$U/_yosoytupadre\
+	$U/_zombie
+
+# Regla para compilar test_prioridad
+$U/_test_prioridad: $U/test_prioridad.o $(ULIB)
+	$(LD) $(LDFLAGS) -T $U/user.ld -o $U/_test_prioridad $U/test_prioridad.o $(ULIB)
+	$(OBJDUMP) -S $U/_test_prioridad > $U/test_prioridad.asm
+	$(OBJDUMP) -t $U/_test_prioridad | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $U/test_prioridad.sym
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
@@ -169,7 +167,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 	then echo "-gdb tcp::$(GDBPORT)"; \
 	else echo "-s -p $(GDBPORT)"; fi)
 ifndef CPUS
-CPUS := 3
+CPUS := 1
 endif
 
 QEMUOPTS = -machine virt -bios none -kernel $K/kernel -m 128M -smp $(CPUS) -nographic

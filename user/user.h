@@ -1,5 +1,5 @@
 struct stat;
-
+#include "kernel/types.h"
 // system calls
 int fork(void);
 int exit(int) __attribute__((noreturn));
@@ -22,8 +22,6 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int getancestor(int n);
-
 
 // ulib.c
 int stat(const char*, struct stat*);
