@@ -1,4 +1,4 @@
-# Informe Tarea 0 Ignacia Frega
+# Informe Tarea 2 Ignacia Frega
 El objetivo de esta tarea fue modificar el sistema operativo Xv6-riscv para añadir un sistema de planificación basado en prioridades con un mecanismo de Boost. En este esquema, los procesos con una prioridad numérica menor se ejecutan primero. El Boost ajusta dinámicamente dicha prioridad: cuando un proceso alcanza el valor 9, el boost cambia a -1; y cuando llega a 0, el boost regresa a 1.
 
 ### Explicación de las modificaciones realizadas.
