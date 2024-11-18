@@ -1,87 +1,86 @@
 # Informe Tarea 3 Ignacia Frega
-El objetivo de esta tarea fue modificar el sistema operativo Xv6-riscv para añadir un sistema de planificación basado en prioridades con un mecanismo de Boost. En este esquema, los procesos con una prioridad numérica menor se ejecutan primero. El Boost ajusta dinámicamente dicha prioridad: cuando un proceso alcanza el valor 9, el boost cambia a -1; y cuando llega a 0, el boost regresa a 1.
+El objetivo de esta tarea fue añadir las funciones `mprotect` y `munprotect` al sistema operativo xv6. Estas permiten gestionar los permisos de escritura en regiones específicas de memoria, habilitando un control de solo lectura en páginas seleccionadas y restaurando el acceso de escritura cuando sea necesario.
 
 ### Explicación de las modificaciones realizadas.
 ### En `kernel`
 #### Archivo `proc.h`
-Se añadieron dos nuevos campos a la estructura de proceso en `proc.h`:
+Se realizaron las siguientes inclusiones y declaraciones:
 ```c
-int priority;  // Prioridad del proceso
-int boost;     // Valor de boost
+#include "spinlock.h"
+
+int mprotect(void *addr, int len);
+int munprotect(void *addr, int len);
 ```
-Estos campos controlan la prioridad de cada proceso. Un valor más bajo en priority indica mayor prioridad, y boost ajusta dinámicamente el valor dentro de un rango.
-#### Archivo `proc.c`
-En la función `static struct proc* allocproc(void),` se inicializaron los nuevos campos para cada proceso:
+Estas líneas definen las nuevas funciones encargadas de gestionar la protección de memoria.
+#### Archivo `spinlock.h`
+Se modificó para incluir guards y definir las funciones necesarias para manejar locks:
 ```c
-p->priority = 0;  // Inicializar prioridad en 0
-p->boost = 1;     // Inicializar boost en 1
+#ifndef SPINLOCK_H
+#define SPINLOCK_H
+
+#include "types.h"
+
+// Mutual exclusion lock.
+struct spinlock {
+  uint locked;        // Indica si el lock está activo.
+
+  // Para depuración:
+  char *name;         // Nombre del lock.
+  struct cpu *cpu;    // La CPU que tiene el lock actualmente.
+};
+
+// Declaraciones de funciones para manipular spinlocks
+void initlock(struct spinlock *lock, char *name);
+void acquire(struct spinlock *lock);
+void release(struct spinlock *lock);
+int holding(struct spinlock *lock);
+
+#endif // SPINLOCK_H
 ```
-Esto garantiza que todos los procesos comiencen con la prioridad más alta (0) y un boost positivo (1), que incrementará la prioridad con el tiempo.
-En la función `scheduler(),` se verificó inicialmente el correcto funcionamiento del sistema antes de añadir la lógica de prioridades completa:
+#### Archivo `vm.c`
+Se implementaron las funciones mprotect y munprotect, que manipulan los permisos de las páginas:
 ```c
-void scheduler(void)
-{
-  struct proc *p;
-  struct cpu *c = mycpu();  // Obtener la CPU actual
+int mprotect(void *addr, int len) {
+    struct proc *p = myproc();  // Proceso actual
+    uint64 start = PGROUNDDOWN((uint64)addr);  // Redondear dirección inicial
+    uint64 end = start + len;
 
-  c->proc = 0;
-
-  for(;;){
-    intr_on();  // Habilitar interrupciones
-
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state != RUNNABLE) {
-        release(&p->lock);
-        continue;
-      }
-
-      // Asignar el proceso a la CPU
-      p->state = RUNNING;
-      c->proc = p;
-      
-      swtch(&c->context, &p->context);  // Cambiar el contexto de CPU al proceso
-
-      // Proceso ha terminado de correr
-      c->proc = 0;
-      release(&p->lock);
+    // Verificación 1: Dirección o longitud inválida
+    if (len <= 0 || start >= p->sz || end > p->sz) {
+        return -1; // Error si la longitud es no positiva o si las direcciones no son válidas
     }
-  }
+
+    for (uint64 a = start; a < end; a += PGSIZE) {
+        pte_t *pte = walk(p->pagetable, a, 0); // Buscar la entrada PTE
+        if (pte == 0) {
+            return -1; // Error si la página no está mapeada
+        }
+        *pte &= ~PTE_W; // Desactivar el bit de escritura (solo lectura)
+    }
+    return 0;
+}
+
+int munprotect(void *addr, int len) {
+    struct proc *p = myproc();  // Proceso actual
+    uint64 start = PGROUNDDOWN((uint64)addr);  // Redondear dirección inicial
+    uint64 end = start + len;
+
+    // Verificación 1: Dirección o longitud inválida
+    if (len <= 0 || start >= p->sz || end > p->sz) {
+        return -1; // Error si la longitud es no positiva o si las direcciones no son válidas
+    }
+
+    for (uint64 a = start; a < end; a += PGSIZE) {
+        pte_t *pte = walk(p->pagetable, a, 0); // Buscar la entrada PTE
+        if (pte == 0) {
+            return -1; // Error si la página no está mapeada
+        }
+        *pte |= PTE_W; // Activar el bit de escritura (lectura-escritura)
+    }
+    return 0;
 }
 ```
-Este código inicial asegura que el sistema operativo funciona con un planificador básico antes de implementar la lógica de prioridades completa.
-### En `user`
-Se creó un programa para generar múltiples procesos y observar su comportamiento, programa de prueba `test_prioridad.c`:
-```c
-#include "kernel/types.h"
-#include "kernel/stat.h"
-#include "user/user.h"
 
-int main(void)
-{
-  int pid;
-  int num_procesos = 20;
-
-  for (int i = 0; i < num_procesos; i++) {
-    pid = fork();
-
-    if (pid < 0) {
-      printf("Error al crear el proceso %d\n", i);
-      exit(1);
-    } else if (pid == 0) {
-      printf("Ejecutando proceso %d\n", getpid());
-      sleep(2);  // Dormir el proceso por 2 segundos
-      exit(0);
-    } else {
-      wait(0);  // El proceso padre espera a que cada hijo termine
-    }
-  }
-
-  printf("Todos los procesos han terminado.\n");
-  exit(0);
-}
-```
-Este programa genera 20 procesos, cada uno imprime su PID, duerme por 2 segundos y luego finaliza, mientras el proceso padre espera que todos terminen.
 ### En `Makefile`
 ```makefile
 UPROGS=\  
