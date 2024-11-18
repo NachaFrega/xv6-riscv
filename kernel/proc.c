@@ -110,7 +110,7 @@ static struct proc*
 allocproc(void)
 {
   struct proc *p;
-  
+
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     if(p->state == UNUSED) {
@@ -124,8 +124,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
-  p->priority = 0;  // Inicializar prioridad en 0
-  p->boost = 1;     // Inicializar boost en 1
+
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -446,46 +445,40 @@ void
 scheduler(void)
 {
   struct proc *p;
-  struct cpu *c = mycpu();  // Obtener la CPU actual
+  struct cpu *c = mycpu();
 
   c->proc = 0;
-
   for(;;){
-    // Habilitar interrupciones en este procesador
+    // The most recent process to run may have had interrupts
+    // turned off; enable them to avoid a deadlock if all
+    // processes are waiting.
     intr_on();
 
-    // Iterar sobre la tabla de procesos
+    int found = 0;
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state != RUNNABLE) {
-        release(&p->lock);
-        continue;
+      if(p->state == RUNNABLE) {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+        found = 1;
       }
-
-      // Incrementar la prioridad con el boost
-      p->priority += p->boost;
-
-      // Verificar los límites de prioridad y ajustar el boost
-      if(p->priority >= 9) {
-        p->priority = 9;
-        p->boost = -1;
-      } else if(p->priority <= 0) {
-        p->priority = 0;
-        p->boost = 1;
-      }
-
-      // Cambiar a este proceso
-      p->state = RUNNING;
-      c->proc = p;
-      swtch(&c->context, &p->context);
-
-      // Proceso ha terminado de correr por ahora
-      c->proc = 0;
       release(&p->lock);
+    }
+    if(found == 0) {
+      // nothing to run; stop running on this core until an interrupt.
+      intr_on();
+      asm volatile("wfi");
     }
   }
 }
-
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores

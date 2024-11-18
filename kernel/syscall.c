@@ -6,6 +6,9 @@
 #include "proc.h"
 #include "syscall.h"
 #include "defs.h"
+uint64 sys_mprotect(void);
+uint64 sys_munprotect(void);
+
 
 // Fetch the uint64 at addr from the current process.
 int
@@ -126,6 +129,9 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_mprotect]  sys_mprotect,   
+[SYS_munprotect] sys_munprotect,
+
 };
 
 void

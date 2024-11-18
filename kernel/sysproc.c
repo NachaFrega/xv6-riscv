@@ -6,6 +6,24 @@
 #include "spinlock.h"
 #include "proc.h"
 
+uint64 sys_mprotect(void) {
+    uint64 addr;
+    int len;
+    argaddr(0, &addr);
+    argint(1, &len);
+    return mprotect((void *)addr, len);
+}
+
+uint64 sys_munprotect(void) {
+    uint64 addr;
+    int len;
+    argaddr(0, &addr);
+    argint(1, &len);
+    return munprotect((void *)addr, len);
+}
+
+
+
 uint64
 sys_exit(void)
 {

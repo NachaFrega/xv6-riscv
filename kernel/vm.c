@@ -5,10 +5,11 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "proc.h"
 
-/*
- * the kernel's page table.
- */
+
+
+
 pagetable_t kernel_pagetable;
 
 extern char etext[];  // kernel.ld sets this to end of kernel code.
@@ -448,4 +449,46 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+
+int mprotect(void *addr, int len) {
+    struct proc *p = myproc();  // Proceso actual
+    uint64 start = PGROUNDDOWN((uint64)addr);  // Redondear dirección inicial
+    uint64 end = start + len;
+
+    // Verificación 1: Dirección o longitud inválida
+    if (len <= 0 || start >= p->sz || end > p->sz) {
+        return -1; // Error si la longitud es no positiva o si las direcciones no son válidas
+    }
+
+    for (uint64 a = start; a < end; a += PGSIZE) {
+        pte_t *pte = walk(p->pagetable, a, 0); // Buscar la entrada PTE
+        if (pte == 0) {
+            return -1; // Error si la página no está mapeada
+        }
+        *pte &= ~PTE_W; // Desactivar el bit de escritura (solo lectura)
+    }
+    return 0;
+}
+
+// munprotect: restaura el permiso de escritura en las páginas
+int munprotect(void *addr, int len) {
+    struct proc *p = myproc();  // Proceso actual
+    uint64 start = PGROUNDDOWN((uint64)addr);  // Redondear dirección inicial
+    uint64 end = start + len;
+
+    // Verificación 1: Dirección o longitud inválida
+    if (len <= 0 || start >= p->sz || end > p->sz) {
+        return -1; // Error si la longitud es no positiva o si las direcciones no son válidas
+    }
+
+    for (uint64 a = start; a < end; a += PGSIZE) {
+        pte_t *pte = walk(p->pagetable, a, 0); // Buscar la entrada PTE
+        if (pte == 0) {
+            return -1; // Error si la página no está mapeada
+        }
+        *pte |= PTE_W; // Activar el bit de escritura (lectura-escritura)
+    }
+    return 0;
 }
