@@ -81,99 +81,127 @@ int munprotect(void *addr, int len) {
 }
 ```
 
-### En `Makefile`
-```makefile
-UPROGS=\  
-  $U/_test_prioridad\
-  ...
-```
-Se modificó el `Makefile` para incluir el programa de prueba. Y se añadió una regla para compilarlo:
-```makefile
-$U/_test_prioridad: $U/test_prioridad.o $(ULIB)
-	$(LD) $(LDFLAGS) -T $U/user.ld -o $U/_test_prioridad $U/test_prioridad.o $(ULIB)
-	$(OBJDUMP) -S $U/_test_prioridad > $U/test_prioridad.asm
-	$(OBJDUMP) -t $U/_test_prioridad | sed '1/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $U/test_prioridad.sym
-```
-### Modificación del `scheduler()`
-La versión final del `scheduler` implementa la lógica completa de prioridad y boost:
+#### Archivo `syscall.h`
+Se agregaron los códigos de sistema para las nuevas llamadas:
 ```c
-void 
-scheduler(void)
-{
-  struct proc *p;
-  struct cpu *c = mycpu();  // Obtener la CPU actual
+#define SYS_mprotect  22
+#define SYS_munprotect  23
+```
 
-  c->proc = 0;
+#### Archivo `syscall.c`
+Se añadieron las declaraciones y entradas en el array de llamadas al sistema:
+```c
+uint64 sys_mprotect(void);
+uint64 sys_munprotect(void);
 
-  for(;;){
-    intr_on();  // Habilitar interrupciones
+[SYS_mprotect]  sys_mprotect,
+[SYS_munprotect] sys_munprotect,
+```
 
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state != RUNNABLE) {
-        release(&p->lock);
-        continue;
-      }
+#### Archivo `sysproc.c`
+Se implementaron las funciones de sistema:
+```c
+uint64 sys_mprotect(void) {
+    uint64 addr;
+    int len;
+    argaddr(0, &addr);
+    argint(1, &len);
+    return mprotect((void *)addr, len);
+}
 
-      // Ajustar la prioridad del proceso usando el boost
-      p->priority += p->boost;
-
-      // Verificar y ajustar los límites de la prioridad
-      if(p->priority >= 9) {
-        p->priority = 9;
-        p->boost = -1;
-      } else if(p->priority <= 0) {
-        p->priority = 0;
-        p->boost = 1;
-      }
-
-      // Ejecutar el proceso
-      p->state = RUNNING;
-      c->proc = p;
-      swtch(&c->context, &p->context);
-
-      c->proc = 0;
-      release(&p->lock);
-    }
-  }
+uint64 sys_munprotect(void) {
+    uint64 addr;
+    int len;
+    argaddr(0, &addr);
+    argint(1, &len);
+    return munprotect((void *)addr, len);
 }
 ```
-Esta implementación asegura que la prioridad se ajuste dinámicamente dentro del rango 0-9, usando el boost para regular su comportamiento.
 
-## Ejecución de código
+### En `User`
 
-Al ejecutar por consola `test_prioridad.c`, se obtiene el siguiente resultado:
+#### Archivo `usys.pl`
+Se añadieron las entradas:
+```plaintext
+entry("mprotect");  
+entry("munprotect");
 ```
-init: starting sh
-$ test_prioridad
-Ejecutando proceso 4
-Ejecutando proceso 5
-Ejecutando proceso 6
-Ejecutando proceso 7
-Ejecutando proceso 8
-Ejecutando proceso 9
-Ejecutando proceso 10
-Ejecutando proceso 11
-Ejecutando proceso 12
-Ejecutando proceso 13
-Ejecutando proceso 14
-Ejecutando proceso 15
-Ejecutando proceso 16
-Ejecutando proceso 17
-Ejecutando proceso 18
-Ejecutando proceso 19
-Ejecutando proceso 20
-Ejecutando proceso 21
-Ejecutando proceso 22
-Ejecutando proceso 23
-Todos los procesos han terminado.
+
+#### Archivo `user.h`
+Se declararon las funciones para el espacio de usuario:
+```c
+int mprotect(void *addr, int len);
+int munprotect(void *addr, int len);
 ```
-Esto confirma la correcta ejecución del programa de prueba.
+
+## Código de Prueba
+Se desarrolló un programa para verificar las funciones:
+
+```c
+#include "kernel/types.h"
+#include "kernel/stat.h"
+#include "user/user.h"
+
+int main() {
+    // Alocar memoria con sbrk
+    char *mem = sbrk(4096);  // Alocar una página
+
+    // Verificar si la memoria es escribible
+    printf("Escribiendo en la memoria antes de mprotect...\n");
+    mem[0] = 'A';
+    printf("Escribió correctamente en memoria antes de mprotect: %c\n", mem[0]);
+
+    // Llamar a mprotect para hacer la página de solo lectura
+    if (mprotect(mem, 4096) < 0) {
+        printf("Error: mprotect falló\n");
+        exit(1);
+    }
+
+    // Intentar escribir en la memoria protegida (esto debería fallar)
+    printf("Intentando escribir en la memoria después de mprotect (debería fallar)...\n");
+    if (fork() == 0) {  // Hacemos un fork para que el proceso hijo falle y no afecte al padre
+        mem[0] = 'B';  // Esto debería causar una falla de segmentación
+        printf("Error: se escribió en memoria protegida (esto no debería imprimirse)\n");
+        exit(1);
+    } else {
+        wait(0);  // Espera al proceso hijo
+    }
+
+    // Llamar a munprotect para restaurar el permiso de escritura
+    if (munprotect(mem, 4096) < 0) {
+        printf("Error: munprotect falló\n");
+        exit(1);
+    }
+
+    // Intentar escribir en la memoria nuevamente después de munprotect
+    printf("Intentando escribir en la memoria después de munprotect...\n");
+    mem[0] = 'C';
+    printf("Escribió correctamente en memoria después de munprotect: %c\n", mem[0]);
+
+    printf("Prueba completada.\n");
+    exit(0);
+}
+```
+
+Este programa reserva una página de memoria y la configura como de solo lectura utilizando mprotect, comprobando que cualquier intento de escritura genera un error. Posteriormente, emplea munprotect para restaurar los permisos de escritura y verifica que la memoria vuelve a ser modificable.
+
+## Resultados de la Ejecución
+
+Al ejecutar el código de prueba `test_protect`, se ovtuvo lo siguiente:
+
+```plaintext
+Escribiendo en la memoria antes de mprotect...
+Escribió correctamente en memoria antes de mprotect: A
+Intentando escribir en la memoria después de mprotect (debería fallar)...
+usertrap(): unexpected scause 0xf pid=4
+            sepc=0x58 stval=0x4000
+Intentando escribir en la memoria después de munprotect...
+Escribió correctamente en memoria después de munprotect: C
+Prueba completada.
+```
 
 ### Dificultades encontradas y soluciones implementadas.
-El primer problema que se enfrento fue la confusión entre la versión estándar de xv6 y xv6-riscv. Muchas fuentes sugerían implementar el código usando la variable ptable, que no está presente en xv6-riscv, lo que ocasionó algunos contratiempos iniciales.
-Después se tuvo el error "panic: kerneltrap". Al realizar una investigación más a fondo sobre la versión exacta de xv6-riscv me permitió entender las diferencias y resolver el problema, sin tener que seguir soluciones inaplicables a esta versión.
-Una vez aclaradas las diferencias entre versiones, el progreso fue más fluido y los errores relacionados con ptable y sti() desaparecieron.
+La principal dificultad encontrada es que surgió un inconveniente relacionado con spinlock.h, que ocasionaba errores de compilación. La solución consistió en incluir explícitamente spinlock.h en otros archivos del kernel, como proc.h, para garantizar que la estructura struct spinlock estuviera correctamente definida antes de ser utilizada en diversas partes del sistema.
 
 ### Conclusión
-En esta tarea aprendí la importancia de investigar adecuadamente la versión específica de un sistema operativo, ya que distintas versiones pueden tener diferencias significativas que afectan el desarrollo y la implementación del código.
+En esta tarea aprendí la implementación correcta de las funciones mprotect y munprotect, aprendiendo sobre la gestión de permisos en tablas de páginas. A pesar de los problemas iniciales, las soluciones aplicadas fueron exitosas y permitieron afianzar conocimientos sobre sistemas operativos.
