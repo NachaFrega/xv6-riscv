@@ -1,125 +1,95 @@
-# **Tarea 5**
+# Informe Tarea 4 Ignacia Frega
+El objetivo de esta tarea es implementar un sistema de permisos básicos en xv6 (RISC) que permita gestionar el acceso a los archivos de manera más controlada. Esto incluye habilitar permisos de solo lectura o lectura/escritura, además de introducir un permiso especial para marcar archivos como inmutables, de forma que no puedan ser modificados ni eliminados.
 
-## **Autor**
-- **Diego Troncoso Bustamante**
+## Explicación de las modificaciones realizadas.
 
----
+Antes de proceder con la implementación de la solución, se realizaron modificaciones en varios archivos para corregir errores y adecuar el entorno de desarrollo.
 
-# **Primera Parte**
-
-### **Objetivo General**
-Implementar un sistema de permisos en el sistema operativo `xv6-riscv`, incluyendo lectura, escritura y un nuevo comando `chmod` para cambiar estos permisos.
-
----
-
-## **Pasos Previos**
-
-Antes de implementar la solución, se realizaron ajustes en varios archivos para corregir errores y preparar el entorno de desarrollo.
-
-### **1. `riscv.h`**
-Se añadió al inicio del archivo:
+### En `riscv.h`**
 ```c
 #ifndef RISCV_H
 #define RISCV_H
 ```
-Y al final:
+Al final se agregó:
 ```c
 #endif // RISCV_H
 ```
-**Objetivo:** Garantizar que las declaraciones solo se incluyan una vez.
+Esto para que las declaraciones se incluyan una sola vez.
 
----
-
-### **2. `trampoline.S`**
-Se modificó la línea 112:
+### En `trampoline.S`**
+Se modificó:
 ```asm
 li a0, TRAPFRAME
 ```
-por:
+Por:
 ```asm
 li a0, 0x3FFFFFE000
 ```
-**Objetivo:** Ajustar la dirección del marco de interrupción para que coincida con el nuevo diseño de la memoria.
+Esto para ajustar la dirección del marco de interrupción y que coincida con el nuevo diseño de la memoria.
 
----
-
-### **3. `memlayout.h`**
-Se actualizaron los siguientes parámetros:
+### En `memlayout.h`**
+Se modificó:
 ```c
 #define MAXVA 0x4000000000L
 #define TRAMPOLINE 0x3FFFFFF000L
 #define TRAPFRAME 0x3FFFFFE000L
 ```
-**Objetivo:** Rediseñar el mapeo de memoria virtual para mejorar la compatibilidad y la organización.
+Esto para un nuevo diseño del mapeo de memoria virtual para mejorar la compatibilidad y la organización.
 
----
-
-### **4. `spinlock.h`**
-Se añadió protección contra múltiples inclusiones:
+### En `spinlock.h`**
+Se implementó una protección para evitar múltiples inclusiones:
 ```c
 #ifndef SPINLOCK_H
 #define SPINLOCK_H
 // Código de spinlock
 #endif // SPINLOCK_H
 ```
-**Objetivo:** Asegurar una implementación correcta y evitar errores de redefinición.
+Esto para asegurar una implementación correcta y evitar errores de redefinición.
 
----
-
-### **5. Otros Archivos Modificados**
-- **`defs.h`:** Se añadió `#include "riscv.h"`.
-- **`proc.h`:** Se añadieron:
+### También se modificó:
+- `defs.h`: Se añadió `#include "riscv.h"`.
+- `proc.h`: Se añadieron:
   ```c
   #include "riscv.h"
   #include "spinlock.h"
   ```
-- **`sleeplock.h`:** Se añadió `#include "spinlock.h"`.
-- **`stat.h`:** Se añadió `#include "types.h"`.
+- `sleeplock.h`: Se añadió `#include "spinlock.h"`.
+- `stat.h`: Se añadió `#include "types.h"`.
 
-**Objetivo:** Asegurar que las dependencias estén correctamente resueltas.
+Esto para que las dependencias estén correctamente resueltas.
 
----
+Esos pasos se realizaron debido a los errores reportados en la consola durante la implementación, estos son los archivos principales que garantizaron que la primera parte se completara con éxito.
 
-## **Implementación de la Tarea**
-
-Despues de todo ese paso previo que fue gracias a los erorres arrojados por consola al momento de implementar la solución, estos son los archivos principales para que la primera parte resultada satisfecha al 100%
-
-### **1. Modificaciones a la estructura `inode`**
-En **`file.h`**, se añadió el campo `perm` para almacenar los permisos:
+### A la estructura `inode` se le modificó:
+En `file.h`, se añadió el campo `perm` para almacenar los permisos:
 ```c
 struct inode {
     ...
     int perm; // 0 = no acceso, 1 = lectura, 2 = escritura, 3 = lectura/escritura
 };
 ```
-**Objetivo:** Almacenar los permisos de los archivos.
 
----
-
-### **2. Cambios en la asignación de inodos**
-En **`fs.c`**, se modificó la función `ialloc` para inicializar los permisos:
+### Se hizo cambios en la asignación de inodos:
+En `fs.c`, se modificó la función `ialloc` para inicializar los permisos:
 ```c
 ip->perm = 3; // Permiso predeterminado: lectura/escritura
 ```
-**Objetivo:** Asegurar que los nuevos archivos tengan permisos adecuados por defecto.
 
----
-
-### **3. Modificaciones en las syscalls**
-En **`sysfile.c`**, se añadieron verificaciones de permisos en las funciones:
-- **`sys_read`:**
+### A syscalls se le hizo las siguientes modificaciones:
+En `sysfile.c`, se añadieron verificaciones de permisos en las funciones:
+- `sys_read`:
   ```c
   if (f->ip && (f->ip->perm & 1) == 0) {
       return -1; // Sin permiso de lectura
   }
   ```
-- **`sys_write`:**
+- `sys_write`:
   ```c
   if (f->ip && (f->ip->perm & 2) == 0) {
       return -1; // Sin permiso de escritura
   }
   ```
-- **`sys_open`:**
+- `sys_open`:
   ```c
   if ((ip->perm & 1) == 0 && (omode & O_RDONLY)) {
       return -1; // Sin permiso de lectura
@@ -129,10 +99,8 @@ En **`sysfile.c`**, se añadieron verificaciones de permisos en las funciones:
   }
   ```
 
----
-
-### **4. Implementación de `chmod`**
-En **`sysproc.c`**, se añadió la syscall `sys_chmod`:
+### Implementación de `chmod`:
+En `sysproc.c`, se añadió la syscall `sys_chmod`:
 ```c
 uint64 sys_chmod(void) {
     char path[MAXPATH];
@@ -155,33 +123,31 @@ uint64 sys_chmod(void) {
     return 0; // Éxito
 }
 ```
-**Objetivo:** La syscall **`sys_chmod`** permite cambiar los permisos de un archivo en `xv6-riscv`. Modifica el campo de permisos (`perm`) del inodo del archivo para controlar si puede ser leído, escrito o ambas cosas. 
+Esto porque la syscall `sys_chmod` permite cambiar los permisos de un archivo en `xv6-riscv`. Ajusta el campo de permisos (perm) del inodo del archivo para definir si este puede ser leído, escrito o ambos.
 
----
-
-### **5. Cambios en otros archivos**
-- **`syscall.h`:** Se añadió:
+### Modificaciones en otros archivos:
+- En `syscall.h`: Se añadió:
   ```c
   #define SYS_chmod 22
   ```
-- **`syscall.c`:** Se registró la syscall:
+- En `syscall.c`: Se registró la syscall:
   ```c
   extern uint64 sys_chmod(void);
   [SYS_chmod] sys_chmod,
   ```
-- **`usys.pl`:** Se añadió:
+- En `usys.pl`: Se añadió:
   ```c
   entry("chmod");
   ```
-- **`user.h`:** Se añadió:
+- En `user.h`: Se añadió:
   ```c
   int chmod(const char *path, int mode);
   ```
 
 ---
 
-### **6. Prueba**
-Se creó el archivo **`testchmod.c`**:
+### Por último, se realizó la prueba:
+Se creó el archivo `testchmod.c`:
 ```c
 #include "kernel/stat.h"
 #include "user.h"
@@ -251,9 +217,7 @@ int main() {
 
 ```
 
----
-
-## **Resultados Obtenidos**
+## Resultados:
 Al ejecutar el programa de prueba:
 ```bash
 $ testchmod
@@ -268,40 +232,19 @@ $ cat testfile.txt
 Permisos restaurados.
 ```
 
-**Conclusión:** La implementación de permisos y la syscall `chmod` funcionan correctamente para la primera parte, ahora, veremos la segunda parte de la tarea.
-
----
-
 # Segunda Parte
 
-### Objetivo
+El objetivo de la segunda parte de la tarea es agregar un permiso especial (número 5) a los archivos, marcándolos como inmutables. Esto implica que los archivos inmutables son considerados como solo lectura, además que no se pueden modificar los permisos de un archivo inmutable usando `chmod`.
 
-Agregar un permiso especial (número 5) a los archivos, marcándolos como inmutables. Esto implica:
+## Modificaciones iniciales:
 
-1. Los archivos inmutables son considerados como **solo lectura**.
-2. No se pueden modificar los permisos de un archivo inmutable usando `chmod`.
-
----
-
-## Modificaciones Previas
-
-### Archivo: `defs.h`
-
-Se modificó:
-
+### En `defs.h` se modificó:
 ```c
 int argint(int, int*);
 ```
+Esto porque la declaración se ajustó para que coincida con la implementación de `argint`.
 
-**¿Por qué?**  
-La declaración se ajustó para que coincida con la implementación de `argint`, ya que esta debe devolver un valor indicando éxito o error.
-
----
-
-### Archivo: `syscall.c`
-
-Se modificó:
-
+### En `syscall.c` se modificó:
 ```c
 int
 argint(int n, int *ip)
@@ -313,19 +256,10 @@ argint(int n, int *ip)
     return 0; // Éxito
 }
 ```
+Esto porque la función `argint` se modificó para devolver un valor que indique éxito (`0`) o error (`-1`). Esto permite manejar errores al obtener argumentos en las llamadas al sistema.
 
-**¿Por qué?**  
-La función `argint` se modificó para devolver un valor que indique éxito (`0`) o error (`-1`). Esto permite manejar errores al obtener argumentos en las llamadas al sistema, mejorando la robustez del sistema.
-
----
-
-### Implementación Segunda Parte
-
-#### Modificaciones a `sys_open` y `sys_write`
-
-Se realizaron cambios para manejar el permiso especial `5` (inmutable).
-
-1. **`sys_open`**
+#### Modificaciones a `sys_open` y `sys_write`:
+En `sys_open`:
    - Se bloquea la apertura de archivos en modo escritura si el archivo es inmutable.
    - Código relevante:
      ```c
@@ -335,8 +269,7 @@ Se realizaron cambios para manejar el permiso especial `5` (inmutable).
          return -1; // No se puede abrir en modo escritura si es inmutable
      }
      ```
-
-2. **`sys_write`**
+En `sys_write`:
    - Se bloquea la escritura en archivos inmutables.
    - Código relevante:
      ```c
@@ -345,15 +278,9 @@ Se realizaron cambios para manejar el permiso especial `5` (inmutable).
      }
      ```
 
-**¿Por qué?**  
-Estos cambios aseguran que los archivos marcados como inmutables no puedan ser modificados ni escritos.
+Se realizaron cambios para manejar el permiso especial `5` (inmutable).
 
----
-
-#### Modificación a `sys_chmod`
-
-Código actualizado:
-
+#### En `sys_chmod` se modificó:
 ```c
 uint64
 sys_chmod(void)
@@ -393,16 +320,9 @@ sys_chmod(void)
     return 0; // Éxito
 }
 ```
+Esto porque se añadió la lógica para evitar que los permisos de archivos inmutables sean modificados, garantizando su inmutabilidad.
 
-**¿Por qué?**  
-Se añadió la lógica para evitar que los permisos de archivos inmutables sean modificados, garantizando su inmutabilidad.
-
----
-
-### Programa de Prueba: `testchmod.c`
-
-Código:
-
+### `testchmod.c`:
 ```c
 #include "kernel/stat.h"
 #include "user.h"
@@ -477,13 +397,9 @@ int main() {
     exit(0);
 }
 ```
+Se creó un programa de prueba con los cambios implementados en el sistema de permisos, incluyendo el manejo de archivos inmutables.
 
-**¿Por qué?**  
-Este programa prueba los cambios implementados en el sistema de permisos, incluyendo el manejo de archivos inmutables.
-
----
-
-## **Resultados Obtenidos**
+## Resultados:
 Al ejecutar el programa de prueba:
 ```bash
 $ testchmod
@@ -499,13 +415,5 @@ $ cat testfile.txt
 Permisos restaurados.
 ```
 
-Obteniendo los resultados esperados para la segunda parte de la tarea.
-
-
-
-
 ## Conclusiones
-
-Esta tarea fue compleja debido a la cantidad de modificaciones necesarias en archivos secundarios del kernel, como `defs.h`, `syscall.c` y `sysproc.c`. Implementar y probar los permisos especiales requirió un profundo entendimiento del flujo interno de **`xv6-riscv`**. Sin embargo, los resultados demuestran que el sistema puede manejar permisos estándar e inmutables de manera robusta.
-
-Muchas gracias!!!
+Esta tarea presentó un alto nivel de complejidad debido a la cantidad de modificaciones requeridas en archivos secundarios del kernel, como defs.h, syscall.c y sysproc.c. La implementación y prueba de los permisos especiales demandaron un conocimiento detallado del flujo interno de xv6-riscv. No obstante, los resultados finales confirman que el sistema es capaz de gestionar de forma robusta tanto los permisos estándar como los inmutables.
