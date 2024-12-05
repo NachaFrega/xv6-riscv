@@ -198,25 +198,33 @@ static struct inode* iget(uint dev, uint inum);
 struct inode*
 ialloc(uint dev, short type)
 {
-  int inum;
-  struct buf *bp;
-  struct dinode *dip;
+    int inum;
+    struct buf *bp;
+    struct dinode *dip;
 
-  for(inum = 1; inum < sb.ninodes; inum++){
-    bp = bread(dev, IBLOCK(inum, sb));
-    dip = (struct dinode*)bp->data + inum%IPB;
-    if(dip->type == 0){  // a free inode
-      memset(dip, 0, sizeof(*dip));
-      dip->type = type;
-      log_write(bp);   // mark it allocated on the disk
-      brelse(bp);
-      return iget(dev, inum);
+    for(inum = 1; inum < sb.ninodes; inum++){
+        bp = bread(dev, IBLOCK(inum, sb));
+        dip = (struct dinode*)bp->data + inum%IPB;
+        if(dip->type == 0){  // a free inode
+            memset(dip, 0, sizeof(*dip));
+            dip->type = type;
+            log_write(bp);   // mark it allocated on the disk
+            brelse(bp);
+
+            // Obtenemos el inode en memoria
+            struct inode *ip = iget(dev, inum);
+
+            // Inicializamos los permisos a read/write
+            ip->perm = 3; // Default: read/write permissions
+
+            return ip;
+        }
+        brelse(bp);
     }
-    brelse(bp);
-  }
-  printf("ialloc: no inodes\n");
-  return 0;
+    printf("ialloc: no inodes\n");
+    return 0;
 }
+
 
 // Copy a modified in-memory inode to disk.
 // Must be called after every change to an ip->xxx field

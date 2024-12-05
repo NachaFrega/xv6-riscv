@@ -1,6 +1,13 @@
+#ifndef USER_H
+#define USER_H
+
+// Tipos básicos
+typedef unsigned int uint;
+
+// Estructuras
 struct stat;
 
-// system calls
+// Llamadas al sistema
 int fork(void);
 int exit(int) __attribute__((noreturn));
 int wait(int*);
@@ -22,15 +29,16 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int mprotect(void *addr, int len);
-int munprotect(void *addr, int len);
+int chmod(const char *path, int mode); // Declaración de chmod
 
+// Función de llamada al sistema (declaración necesaria)
+int syscall(int num, ...); // Declaración de syscall para espacio de usuario
 
-// ulib.c
+// Funciones de biblioteca estándar
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);
-void *memmove(void*, const void*, int);
-char* strchr(const char*, char c);
+void* memmove(void*, const void*, int);
+char* strchr(const char*, char);
 int strcmp(const char*, const char*);
 void fprintf(int, const char*, ...) __attribute__ ((format (printf, 2, 3)));
 void printf(const char*, ...) __attribute__ ((format (printf, 1, 2)));
@@ -39,8 +47,10 @@ uint strlen(const char*);
 void* memset(void*, int, uint);
 int atoi(const char*);
 int memcmp(const void *, const void *, uint);
-void *memcpy(void *, const void *, uint);
+void* memcpy(void *, const void *, uint);
 
-// umalloc.c
+// Administrador de memoria dinámico
 void* malloc(uint);
 void free(void*);
+
+#endif // USER_H

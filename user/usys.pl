@@ -36,5 +36,4 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
-entry("mprotect");  
-entry("munprotect");
+entry("chmod");

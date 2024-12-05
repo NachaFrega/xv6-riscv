@@ -1,9 +1,7 @@
+#include "riscv.h"
+#include "spinlock.h"
 
-#include "spinlock.h" 
-
-int mprotect(void *addr, int len);
-int munprotect(void *addr, int len);
-
+// Saved registers for kernel context switches.
 struct context {
   uint64 ra;
   uint64 sp;

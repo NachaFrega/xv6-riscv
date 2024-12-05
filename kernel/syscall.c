@@ -6,9 +6,6 @@
 #include "proc.h"
 #include "syscall.h"
 #include "defs.h"
-uint64 sys_mprotect(void);
-uint64 sys_munprotect(void);
-
 
 // Fetch the uint64 at addr from the current process.
 int
@@ -56,10 +53,14 @@ argraw(int n)
 }
 
 // Fetch the nth 32-bit system call argument.
-void
+int
 argint(int n, int *ip)
 {
-  *ip = argraw(n);
+    if (n < 0 || n >= 3) // Validar que el índice del argumento sea válido
+        return -1;
+
+    *ip = argraw(n);
+    return 0; // Éxito
 }
 
 // Retrieve an argument as a pointer.
@@ -104,6 +105,7 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
+extern uint64 sys_chmod(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -129,9 +131,7 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
-[SYS_mprotect]  sys_mprotect,   
-[SYS_munprotect] sys_munprotect,
-
+[SYS_chmod] sys_chmod,
 };
 
 void

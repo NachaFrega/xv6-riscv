@@ -39,12 +39,16 @@
 #define KERNBASE 0x80000000L
 #define PHYSTOP (KERNBASE + 128*1024*1024)
 
-// map the trampoline page to the highest address,
-// in both user and kernel space.
-#define TRAMPOLINE (MAXVA - PGSIZE)
+// Explicitly calculate MAXVA based on RISC-V paging rules.
+// Original definition: #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
+// Replaced with the evaluated value for clarity and assembler compatibility.
+#define MAXVA 0x4000000000L
 
-// map kernel stacks beneath the trampoline,
-// each surrounded by invalid guard pages.
+// Map the trampoline page to the highest address in both user and kernel space.
+// Explicit calculation: TRAMPOLINE = MAXVA - PGSIZE
+#define TRAMPOLINE 0x3FFFFFF000L
+
+// Map kernel stacks beneath the trampoline, each surrounded by invalid guard pages.
 #define KSTACK(p) (TRAMPOLINE - ((p)+1)* 2*PGSIZE)
 
 // User memory layout.
@@ -56,4 +60,6 @@
 //   ...
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
-#define TRAPFRAME (TRAMPOLINE - PGSIZE)
+#define TRAPFRAME 0x3FFFFFE000L
+
+
