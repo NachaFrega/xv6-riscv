@@ -5,7 +5,7 @@ El objetivo de esta tarea es implementar un sistema de permisos básicos en xv6 
 
 Antes de proceder con la implementación de la solución, se realizaron modificaciones en varios archivos para corregir errores y adecuar el entorno de desarrollo.
 
-### En `riscv.h`**
+### En `riscv.h`
 ```c
 #ifndef RISCV_H
 #define RISCV_H
@@ -16,8 +16,7 @@ Al final se agregó:
 ```
 Esto para que las declaraciones se incluyan una sola vez.
 
-### En `trampoline.S`**
-Se modificó:
+### En `trampoline.S` se modificó:
 ```asm
 li a0, TRAPFRAME
 ```
@@ -27,8 +26,7 @@ li a0, 0x3FFFFFE000
 ```
 Esto para ajustar la dirección del marco de interrupción y que coincida con el nuevo diseño de la memoria.
 
-### En `memlayout.h`**
-Se modificó:
+### En `memlayout.h` se modificó:
 ```c
 #define MAXVA 0x4000000000L
 #define TRAMPOLINE 0x3FFFFFF000L
@@ -36,7 +34,7 @@ Se modificó:
 ```
 Esto para un nuevo diseño del mapeo de memoria virtual para mejorar la compatibilidad y la organización.
 
-### En `spinlock.h`**
+### En `spinlock.h`
 Se implementó una protección para evitar múltiples inclusiones:
 ```c
 #ifndef SPINLOCK_H
